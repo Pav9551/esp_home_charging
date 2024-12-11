@@ -17,7 +17,7 @@ logger:
 # Reference the secrets file from a directory above
 substitutions: !include ../secrets.yaml
 mqtt:
-  id: mqtt_client
+  id: mqtt_client #MQTT id
   broker: "${mqtt_broker}"
   port: 1883
   username: "${mqtt_username}"
@@ -68,7 +68,7 @@ canbus:
                 x[6] == 0x00 && x[7] == 0x00) {
               ESP_LOGD("main", "Value of my hex: %x, %x, %x, %x, %x, %x, %x, %x", x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7]); 
               id(id_GPIO2).turn_on();
-              id(mqtt_client).publish("5277-09_mu/new/topic", "Turning on");
+              id(mqtt_client).publish("5277-09_mu/new/topic", "Turning on");// MQTT publish
               }
               if (x.size() == 8 && pdo_id > 0 &&
                 x[0] == 0x10 && x[1] == 0x04 && x[2] == 0x00 &&
@@ -76,7 +76,7 @@ canbus:
                 x[6] == 0x00 && x[7] == 0x01) {
               ESP_LOGD("main", "Value of my hex: %x, %x, %x, %x, %x, %x, %x, %x", x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7]); 
               id(id_GPIO2).turn_off();
-              id(mqtt_client).publish("5277-09_mu/new/topic", "Turning off");
+              id(mqtt_client).publish("5277-09_mu/new/topic", "Turning off");// MQTT publish
               }
               else {
               
