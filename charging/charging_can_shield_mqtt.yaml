@@ -15,7 +15,7 @@ globals:
     initial_value: '0'
 logger:
 # Reference the secrets file from a directory above
-substitutions: !include ../secrets.yaml
+substitutions: !include ../../secrets.yaml
 mqtt:
   id: mqtt_client #MQTT id
   broker: "${mqtt_broker}"
