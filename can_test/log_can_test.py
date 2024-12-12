@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 
 # Настройка логирования с указанием формата временной метки
-logging.basicConfig(filename='can_logging.log', level=logging.INFO, format='%(asctime)s - %(message)s',filemode='a')
+logging.basicConfig(filename='can_logging.log', level=logging.INFO, format='%(message)s',filemode='w')
 
 bus1 = can.interface.Bus(channel='can0', interface='socketcan')
 bus2 = can.interface.Bus(channel='can1', interface='socketcan')
@@ -32,24 +32,31 @@ commands_to_send = [
 
     {"bus": bus1, "id": 0x150, "data": "00 00 00 00 00 00 00 00", "extended": False},
     {"bus": bus1, "id": 0x150, "data": "01 00 00 00 00 00 00 00", "extended": False},    
-    {"bus": bus1, "id": 0x160, "data": "00 FF 03 00 00 00 00 00", "extended": False},
+    {"bus": bus1, "id": 0x160, "data": "01 FF 00 00 00 00 00 00", "extended": False},
+    {"bus": bus1, "id": 0x160, "data": "01 FF 01 00 00 00 00 00", "extended": False},
+    {"bus": bus1, "id": 0x160, "data": "01 FF 02 00 00 00 00 00", "extended": False},
     {"bus": bus1, "id": 0x160, "data": "01 FF 03 00 00 00 00 00", "extended": False},
-    {"bus": bus1, "id": 0x161, "data": "00 FF 03 00 00 00 00 00", "extended": False},
-    {"bus": bus1, "id": 0x161, "data": "01 FF 03 00 00 00 00 00", "extended": False},
+    {"bus": bus1, "id": 0x160, "data": "01 FF 03 00 00 00 00 00", "extended": False},
+    {"bus": bus1, "id": 0x160, "data": "01 FF 02 00 00 00 00 00", "extended": False},
+    {"bus": bus1, "id": 0x160, "data": "01 FF 01 00 00 00 00 00", "extended": False},
+    {"bus": bus1, "id": 0x160, "data": "01 FF 00 00 00 00 00 00", "extended": False},
+    {"bus": bus1, "id": 0x160, "data": "00 00 00 00 00 00 00 00", "extended": False},
 #    {"bus": bus2, "id": 0x1, "data": "10 04 00 00 00 00 00 00", "extended": True},
 #    {"bus": bus2, "id": 0x2, "data": "10 04 00 00 00 00 00 01", "extended": True},
 #    {"bus": bus2, "id": 0x3, "data": "10 04 00 00 00 00 00 00", "extended": True},
 #    {"bus": bus2, "id": 0x4, "data": "10 04 00 00 00 00 00 01", "extended": True},
 ]
-def log_message(action, bus_name, arbitration_id, message):
-    """Функция для логирования сообщений с временной меткой."""
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-    logging.info(f"{current_time} - {action:<8} on {bus_name}: Arbitration ID: {hex(arbitration_id):<10}, Data: {binascii.hexlify(message, ' ')}")
+
+def log_message(action, bus_name, arbitration_id, message, is_extended):
+    """Функция для логирования сообщений с временной меткой и типом пакета."""
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # Only time, no date
+    message_type = "Extended" if is_extended else "Standard"
+    logging.info(f"{current_time} - {action:<8} on {bus_name}: ID: {hex(arbitration_id):<10} {message_type} Data: {binascii.hexlify(message, ' ')}")
 
 def send_can2_id(id, message):
     msg = can.Message(arbitration_id=id, data=bytes.fromhex(message), is_extended_id=True)
     #bus2.send(msg)
-    log_message("Sent", "bus2", msg.arbitration_id, msg.data)
+    log_message("Sent____", "bus2", msg.arbitration_id, msg.data)
 def send_commands(commands):
     for command in commands:
         # Создание CAN-сообщения
@@ -63,19 +70,19 @@ def send_commands(commands):
         print(f"Sent: ID={hex(command['id'])} [{id_type}] Data={command['data']}")
         # Логирование
         bus_name = "bus1" if command["bus"] == bus1 else "bus2"
-        log_message("Sent", bus_name, command["id"], msg.data)
+        log_message("Sent____", bus_name, command["id"], msg.data, msg.is_extended_id)
         # Задержка между отправками
         time.sleep(0.5)
 class CanListener1(can.Listener):
     def on_message_received(self, message):
         global pid
-        log_message("Received", "bus1", message.arbitration_id, message.data)
+        log_message("Received", "bus1", message.arbitration_id, message.data, message.is_extended_id)
         print(hex(message.arbitration_id), binascii.hexlify(message.data, " "))
 
 class CanListener2(can.Listener):
     def on_message_received(self, message):
         global pid
-        log_message("Received", "bus2", message.arbitration_id, message.data)
+        log_message("Received", "bus2", message.arbitration_id, message.data, message.is_extended_id)
         print(hex(message.arbitration_id), binascii.hexlify(message.data, " "))
 if __name__ == "__main__":
     listener1 = CanListener1()
