@@ -1,0 +1,83 @@
+# esphome run green_power/green_power.yaml
+# esphome logs green_power/green_power.yaml
+#https://esphome.io/components/canbus/
+esphome:
+  name: green_power
+  platform: ESP32
+  board: esp32dev
+
+globals:
+  - id: my_variable
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: broadcast
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+wifi:
+  networks:
+  - ssid: 'NaukaSoft_11'
+    password: '1788@DFgh'
+  - ssid: 'AndroidAP'
+    password: 'zdec3925'
+  - ssid: 'EKB'
+    password: 'powermcb'
+
+mqtt:
+  id: mqtt_client
+  broker: "149.154.66.246"
+  port: 1883
+  username: "mqtt_user"
+  password: "mqtt_user"
+
+ota:
+  platform: esphome
+  password: "191c8acd2759f813abbf1ec765edf1f2"
+
+logger:
+
+output:
+  - platform: gpio
+    id: id_GPIO2
+    pin:
+      number: GPIO2
+      mode: OUTPUT
+
+canbus:
+  - platform: esp32_can
+    id: esp32_can_bus
+    rx_pin: GPIO22
+    tx_pin: GPIO21
+    bit_rate: 125kbps
+    can_id: 5
+    use_extended_id: true
+    on_frame:
+      - can_id:      0b00000000000000000000000000000
+        can_id_mask: 0b00000000000000000000000000000
+        use_extended_id: true
+        remote_transmission_request: false
+        then:
+          - lambda: |-
+              {
+                std::string msg_in(x.begin(), x.end()); 
+                int module_addr = (can_id >> 14) & 0x7F;
+                int msg_type = x[0] & 0xF;
+                int cmd_type = x[1];
+                char topic[50];
+                char payload[50];
+
+                ESP_LOGD("addr", "address=%x", can_id); 
+                ESP_LOGD("info", "Module address: %d, MessageType: %d, CommandType: %d", module_addr, msg_type, cmd_type); 
+                
+                if (msg_type == 2) { // ReadData        
+                  if (module_addr > 0) { //individual module 
+                    ESP_LOGD("MQTT", "Sending request to MQTT"); 
+
+                    sprintf(topic, "green_power/module_state/%02x", module_addr);
+                    sprintf(payload, "%d", cmd_type);
+                    id(mqtt_client).publish(topic, payload);
+                  }
+                }                      
+              }
