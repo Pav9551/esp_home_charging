@@ -15,6 +15,10 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
+  - id: m1_addr
+    type: int
+    restore_value: no
+    initial_value: '1'
 
 wifi:
   networks:
@@ -44,6 +48,50 @@ output:
     pin:
       number: GPIO2
       mode: OUTPUT
+
+
+
+number:
+#    m1_addr
+    - platform: template
+      name: "m1_addr"
+      optimistic: true
+      min_value: 0
+      max_value: 47
+      initial_value: 0
+      step: 1
+      mode: slider
+      on_value:
+        then:
+        - lambda: |-
+            id(m1_addr) = 0x2200000 | ((int)x << 14);
+
+#    m1_current
+    - platform: template
+      name: "m1_current"
+      optimistic: true
+      min_value: 0
+      max_value: 50000
+      initial_value: 0
+      step: 1
+      mode: slider
+      id: m1_current
+      on_value:
+        then:
+        - lambda: |-
+            uint8_t byte0 = (uint8_t)0x13; // group=0x1, commandType=0x3
+            uint8_t byte1 = (uint8_t)1;    // Iout_slow
+
+            int value = (int)id(m1_current).state;
+            unsigned char byte4 = (value & 0xFF000000) >> 24; 
+            unsigned char byte5 = (value & 0x00FF0000) >> 16; 
+            unsigned char byte6 = (value & 0x0000FF00) >> 8; 
+            unsigned char byte7 = (value & 0x000000FF); 
+
+            ESP_LOGD("m1_current", "input: %d; byte4=%x,byte5=%x,byte6=%x,byte7=%x", value, byte4, byte5, byte6, byte7); 
+            
+            id(esp32_can_bus).send_data((int)id(m1_addr), true, 
+              { byte0, byte1, 0x00, 0x00, (uint8_t)byte4, (uint8_t)byte5, (uint8_t)byte6, (uint8_t)byte7 });
 
 canbus:
   - platform: esp32_can
