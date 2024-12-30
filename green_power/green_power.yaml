@@ -1,0 +1,138 @@
+# esphome run green_power/green_power.yaml
+# esphome logs green_power/green_power.yaml
+#https://esphome.io/components/canbus/
+esphome:
+  name: green_power
+  platform: ESP32
+  board: esp32dev
+
+globals:
+  - id: my_variable
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: broadcast
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: m1_addr
+    type: int
+    restore_value: no
+    initial_value: '1'
+
+# Reference the secrets file from a directory above
+substitutions: !include ../../secrets.yaml
+mqtt:
+  id: mqtt_client #MQTT id
+  broker: "${mqtt_broker}"
+  port: 1883
+  username: "${mqtt_username}"
+  password: "${mqtt_password}"
+ota:
+  platform: esphome
+  password: "${ota_password}"
+
+wifi:
+  networks:
+  - ssid: '${wifi_ssid1}'
+    password: '${wifi_password1}'
+  - ssid: '${wifi_ssid2}'
+    password: '${wifi_password2}'
+  - ssid: '${wifi_ssid3}'
+    password: '${wifi_password3}'
+  reboot_timeout: 60s
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: 'abc'
+    password: '12345678'
+
+logger:
+
+output:
+  - platform: gpio
+    id: id_GPIO2
+    pin:
+      number: GPIO2
+      mode: OUTPUT
+
+
+
+number:
+#    m1_addr
+    - platform: template
+      name: "m1_addr"
+      optimistic: true
+      min_value: 0
+      max_value: 47
+      initial_value: 0
+      step: 1
+      mode: slider
+      on_value:
+        then:
+        - lambda: |-
+            id(m1_addr) = 0x2200000 | ((int)x << 14);
+
+#    m1_current
+    - platform: template
+      name: "m1_current"
+      optimistic: true
+      min_value: 0
+      max_value: 50000
+      initial_value: 0
+      step: 1
+      mode: slider
+      id: m1_current
+      on_value:
+        then:
+        - lambda: |-
+            uint8_t byte0 = (uint8_t)0x13; // group=0x1, commandType=0x3
+            uint8_t byte1 = (uint8_t)1;    // Iout_slow
+
+            int value = (int)id(m1_current).state;
+            unsigned char byte4 = (value & 0xFF000000) >> 24; 
+            unsigned char byte5 = (value & 0x00FF0000) >> 16; 
+            unsigned char byte6 = (value & 0x0000FF00) >> 8; 
+            unsigned char byte7 = (value & 0x000000FF); 
+
+            ESP_LOGD("m1_current", "input: %d; byte4=%x,byte5=%x,byte6=%x,byte7=%x", value, byte4, byte5, byte6, byte7); 
+            
+            id(esp32_can_bus).send_data((int)id(m1_addr), true, 
+              { byte0, byte1, 0x00, 0x00, (uint8_t)byte4, (uint8_t)byte5, (uint8_t)byte6, (uint8_t)byte7 });
+
+canbus:
+  - platform: esp32_can
+    id: esp32_can_bus
+    rx_pin: GPIO22
+    tx_pin: GPIO21
+    bit_rate: 125kbps
+    can_id: 5
+    use_extended_id: true
+    on_frame:
+      - can_id:      0b00000000000000000000000000000
+        can_id_mask: 0b00000000000000000000000000000
+        use_extended_id: true
+        remote_transmission_request: false
+        then:
+          - lambda: |-
+              {
+                std::string msg_in(x.begin(), x.end()); 
+                int module_addr = (can_id >> 14) & 0x7F;
+                int msg_type = x[0] & 0xF;
+                int cmd_type = x[1];
+                char topic[50];
+                char payload[50];
+
+                ESP_LOGD("addr", "address=%x", can_id); 
+                ESP_LOGD("info", "Module address: %d, MessageType: %d, CommandType: %d", module_addr, msg_type, cmd_type); 
+                
+                if (msg_type == 2) { // ReadData        
+                  if (module_addr > 0) { //individual module 
+                    ESP_LOGD("MQTT", "Sending request to MQTT"); 
+
+                    sprintf(topic, "green_power/module_state/%02x", module_addr);
+                    sprintf(payload, "%d", cmd_type);
+                    id(mqtt_client).publish(topic, payload);
+                  }
+                }                      
+              }

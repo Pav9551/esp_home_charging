@@ -1,0 +1,404 @@
+# esphome run 5277/5277-09_mu.yaml
+esphome:
+  name: 5277-09_mu
+esp32:
+  board: nodemcu-32s
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+#api:
+# Reference the secrets file from a directory above
+substitutions: !include ../../secrets.yaml
+mqtt:
+  id: mqtt_client #MQTT id
+  broker: "${mqtt_broker}"
+  port: 1883
+  username: "${mqtt_username}"
+  password: "${mqtt_password}"
+ota:
+  platform: esphome
+  password: "${ota_password}"
+
+wifi:
+  networks:
+  - ssid: '${wifi_ssid1}'
+    password: '${wifi_password1}'
+  - ssid: '${wifi_ssid2}'
+    password: '${wifi_password2}'
+  - ssid: '${wifi_ssid3}'
+    password: '${wifi_password3}'
+  reboot_timeout: 60s
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: 'abc'
+    password: '12345678'
+
+
+output:
+  - platform: gpio
+    id: id_GPI15
+    pin:
+      number: GPIO15
+      mode: OUTPUT
+
+captive_portal:
+# Example configuration entry
+# Example configuration entry for ESP32
+
+globals:
+  - id: broadcast_switch
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: A_switch
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: charge_enabled
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: m1_enabled
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+number:
+#    m1_current
+    - platform: template
+      name: "m1_current"
+      optimistic: true
+      min_value: 0
+      max_value: 1023
+      initial_value: 0
+      step: 1
+      mode: slider
+      id: m1_current
+#    m2_current
+    - platform: template
+      name: "m2_current"
+      optimistic: true
+      min_value: 0
+      max_value: 1023
+      initial_value: 0
+      step: 1
+      mode: slider
+      id: m2_current
+#    m3_current
+    - platform: template
+      name: "m3_current"
+      optimistic: true
+      min_value: 0
+      max_value: 1023
+      initial_value: 0
+      step: 1
+      mode: slider
+      id: m3_current
+#    m4_current
+    - platform: template
+      name: "m4_current"
+      optimistic: true
+      min_value: 0
+      max_value: 1023
+      initial_value: 0
+      step: 1
+      mode: slider
+      id: m4_current
+#    m5_current
+    - platform: template
+      name: "m5_current"
+      optimistic: true
+      min_value: 0
+      max_value: 1023
+      initial_value: 0
+      step: 1
+      mode: slider
+      id: m5_current
+#    m6_current
+    - platform: template
+      name: "m6_current"
+      optimistic: true
+      min_value: 0
+      max_value: 1023
+      initial_value: 0
+      step: 1
+      mode: slider
+      id: m6_current
+
+#    m1_addr
+    - platform: template
+      name: "m1_addr"
+      optimistic: true
+      min_value: 0
+      max_value: 47
+      initial_value: 0
+      step: 1
+      mode: slider
+      id: m1_addr
+#    m2_addr
+    - platform: template
+      name: "m2_addr"
+      optimistic: true
+      min_value: 0
+      max_value: 47
+      initial_value: 1
+      step: 1
+      mode: slider
+      id: m2_addr
+#    m3_addr
+    - platform: template
+      name: "m3_addr"
+      optimistic: true
+      min_value: 0
+      max_value: 47
+      initial_value: 2
+      step: 1
+      mode: slider
+      id: m3_addr
+#    m4_addr
+    - platform: template
+      name: "m4_addr"
+      optimistic: true
+      min_value: 0
+      max_value: 47
+      initial_value: 3
+      step: 1
+      mode: slider
+      id: m4_addr
+#    m5_addr
+    - platform: template
+      name: "m5_addr"
+      optimistic: true
+      min_value: 0
+      max_value: 47
+      initial_value: 4
+      step: 1
+      mode: slider
+      id: m5_addr
+#    m6_addr
+    - platform: template
+      name: "m6_addr"
+      optimistic: true
+      min_value: 0
+      max_value: 47
+      initial_value: 5
+      step: 1
+      mode: slider
+      id: m6_addr
+
+
+switch:
+  - platform: restart
+    id: id_restart
+    name: Restart
+
+# charge_switch
+  - platform: template
+    name: "charge_switch"
+    optimistic: true
+    turn_on_action:
+      - canbus.send:
+          # broadcast address - ON
+          can_id: 0x150
+          use_extended_id: false
+          data: [ 0x01 ]
+    turn_off_action:
+      - canbus.send:
+          # broadcast address - OFF
+          can_id: 0x150
+          use_extended_id: false
+          data: [ 0x00 ]
+
+#    m1_switch
+  - platform: template
+    name: "m1_switch"
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m1_addr).state;        
+          int enabled = 0x1;
+
+          // Формируем байты грубой уставки тока
+          int current = (int)id(m1_current).state;
+          unsigned char byte1 = current & 0xFF;       // LLLL LLLL
+          unsigned char byte2 = (current >> 8) & 0x3; // xxxx xxHH
+
+          // Отправка CAN-сообщения .
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { (uint8_t)enabled, byte1, byte2, 0x00, 0x00, 0x00, 0x00, 0x00 });
+    turn_off_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m1_addr).state;        
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+
+#    m2_switch
+  - platform: template
+    name: "m2_switch"
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m2_addr).state;        
+          int enabled = 0x1;
+
+          // Формируем байты грубой уставки тока
+          int current = (int)id(m2_current).state;
+          unsigned char byte1 = current & 0xFF;       // LLLL LLLL
+          unsigned char byte2 = (current >> 8) & 0x3; // xxxx xxHH
+
+          // Отправка CAN-сообщения .
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { (uint8_t)enabled, byte1, byte2, 0x00, 0x00, 0x00, 0x00, 0x00 });
+    turn_off_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m2_addr).state;        
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+
+#    m3_switch
+  - platform: template
+    name: "m3_switch"
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m3_addr).state;        
+          int enabled = 0x1;
+
+          // Формируем байты грубой уставки тока
+          int current = (int)id(m3_current).state;
+          unsigned char byte1 = current & 0xFF;       // LLLL LLLL
+          unsigned char byte2 = (current >> 8) & 0x3; // xxxx xxHH
+
+          // Отправка CAN-сообщения .
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { (uint8_t)enabled, byte1, byte2, 0x00, 0x00, 0x00, 0x00, 0x00 });
+    turn_off_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m3_addr).state;        
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });          
+
+#    m4_switch
+  - platform: template
+    name: "m4_switch"
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m4_addr).state;        
+          int enabled = 0x1;
+
+          // Формируем байты грубой уставки тока
+          int current = (int)id(m4_current).state;
+          unsigned char byte1 = current & 0xFF;       // LLLL LLLL
+          unsigned char byte2 = (current >> 8) & 0x3; // xxxx xxHH
+
+          // Отправка CAN-сообщения .
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { (uint8_t)enabled, byte1, byte2, 0x00, 0x00, 0x00, 0x00, 0x00 });
+    turn_off_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m4_addr).state;        
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+
+#    m5_switch
+  - platform: template
+    name: "m5_switch"
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m5_addr).state;        
+          int enabled = 0x1;
+
+          // Формируем байты грубой уставки тока
+          int current = (int)id(m5_current).state;
+          unsigned char byte1 = current & 0xFF;       // LLLL LLLL
+          unsigned char byte2 = (current >> 8) & 0x3; // xxxx xxHH
+
+          // Отправка CAN-сообщения .
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { (uint8_t)enabled, byte1, byte2, 0x00, 0x00, 0x00, 0x00, 0x00 });
+    turn_off_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m5_addr).state;        
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+
+#    m6_switch
+  - platform: template
+    name: "m6_switch"
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m6_addr).state;        
+          int enabled = 0x1;
+
+          // Формируем байты грубой уставки тока
+          int current = (int)id(m6_current).state;
+          unsigned char byte1 = current & 0xFF;       // LLLL LLLL
+          unsigned char byte2 = (current >> 8) & 0x3; // xxxx xxHH
+
+          // Отправка CAN-сообщения .
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { (uint8_t)enabled, byte1, byte2, 0x00, 0x00, 0x00, 0x00, 0x00 });
+    turn_off_action:
+      - lambda: |-
+          int module_addr = 0x160 + (int)id(m6_addr).state;        
+          id(mcp2515_bus).send_data(module_addr, false, 
+            { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+
+
+# spi
+spi:
+  - id: McpSpi
+    clk_pin: GPIO18
+    mosi_pin: GPIO23
+    miso_pin: GPIO19
+
+canbus:
+  - platform: mcp2515
+    cs_pin: GPIO5
+    id: mcp2515_bus
+    can_id: 4
+    bit_rate: 500kbps
+    on_frame:
+
+      - can_id: 0x500
+        then:
+          - output.turn_off: id_GPI15
+
+      # input message from module
+      - can_id:      0b00000000000000000000000000000
+        can_id_mask: 0b00000000000000000000000000000
+        remote_transmission_request: false
+        then:
+          - lambda: |-
+              {
+                std::string msg_in(x.begin(), x.end()); 
+                auto addr = can_id;
+                int module_num;
+                char topic[50];
+                char payload[50];
+              
+
+                ESP_LOGD("addr", "input addr: %x", addr); 
+                
+                if (addr >= 0x190 && addr <= 0x1D8) {
+                  module_num = addr - 0x190;
+                  ESP_LOGD("addr", "Module num: %x", module_num); 
+                  ESP_LOGD("contents", "msg_in: %s", msg_in); 
+                  ESP_LOGD("contents", "Input message: %x, %x, %x, %x, %x, %x, %x, %x", x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7]);
+          
+                  sprintf(topic, "5277-09_mu/module_state/%02x", module_num);
+                  sprintf(payload, "%d,%d,%d,%d,%d,%d,%d,%d", x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7]);
+                  id(mqtt_client).publish(topic, payload);
+                }                      
+              }
+
+
+

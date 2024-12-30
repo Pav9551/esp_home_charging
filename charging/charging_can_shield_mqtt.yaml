@@ -42,6 +42,13 @@ binary_sensor:
     name: "Device On/Off State"
     id: device_on_off_state
     device_class: power
+sensor:
+  - platform: template
+    name: "Current in Amperes"
+    id: current_in_amperes
+    unit_of_measurement: "A"
+    accuracy_decimals: 2
+    update_interval: never  # Обновляется через обработчик сообщений
 output:
   - platform: gpio
     id: id_GPIO2
@@ -87,7 +94,17 @@ canbus:
               id(mqtt_client).publish("5277-09_mu/new/topic",  buffer);// MQTT publish
               id(device_on_off_state).publish_state(false);
               }
+              if (x.size() == 8 && x[0] == 0x10 && x[1] == 0x03) {
+              ESP_LOGD("main", "Value of my hex: %x, %x, %x, %x, %x, %x, %x, %x", x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7]); 
+              int raw_value = (int(x[4]) << 24) | (int(x[5]) << 16) | (int(x[6]) << 8) | int(x[7]);
+              float current_value = raw_value * 0.001; // Преобразование в амперы
+              
+              // Обновите состояние сенсора тока
+              id(current_in_amperes).publish_state(current_value);
+              }
               else {
               
               }
+              
+
               }
