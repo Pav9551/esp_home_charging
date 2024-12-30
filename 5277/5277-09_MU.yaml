@@ -38,7 +38,6 @@ wifi:
     ssid: 'abc'
     password: '12345678'
 
-
 output:
   - platform: gpio
     id: id_GPI15
